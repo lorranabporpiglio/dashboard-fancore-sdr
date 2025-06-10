@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acompanhamento - SDR</title>
+</head>
+<body>
+    <wrapper>
+  <nav>
+  <div class="filtros">
+    <select id="filtro-ano">
+      <option value="">Todos os anos</option>
+    </select>
+    <select id="filtro-mes">
+      <option value="">Todos os meses</option>
+    </select>
+  </div>
+</nav>
+  <main>
+    <div class="visaoGeral">
+      <span id="captados"><strong>Captados</strong> 0</span>
+      <span id="qualificados"><strong>Qualificados</strong> 0</span>
+      <span id="agendados"><strong>Reuniões Agendadas</strong> 0</span>
+      <span id="realizados"><strong>Reuniões Realizadas</strong> 0</span>
+      <span id="vendidos"><strong>Vendas</strong> 0</span>
+    </div>
+    <div class="visaoPercentual">
+      <span id="agendadoCaptado"><strong>Agendado x Captado</strong> 0</span>
+      <span id="realizadoAgendado"><strong>Realizado x Agendado</strong> 0</span>
+      <span id="vendaRealizado"><strong>Venda x Realizado</strong> 0</span>
+      <span id="qualificadoCaptado"><strong>Qualificado x Captado</strong> 0</span>
+      <span id="agendadoQualificado"><strong>Agendado x qualificado</strong> 0</span>
+    </div>
+    <table id="tabela-semanas">
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Captados</th>
+          <th>Qualificados</th>
+          <th>Agendados</th>
+          <th>Realizados</th>
+          <th>Vendas</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- As linhas da tabela serão preenchidas aqui -->
+      </tbody>
+    </table>
+    <canvas id="graficoPizza" width="400!Important" height="400"></canvas>
+    <canvas id="graficoBarra" width="400" height="300"></canvas>
+
+  </main>
+</wrapper>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.11/jquery.csv.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+<script>
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSH1d8wtfBTQCdAvAWCaABPdKQ8LE6L6ij8hbfzFfieU7mi-STZsoq_z4TGcO8tv2o1ZGFq7l8Y5haW/pub?gid=0&single=true&output=csv'; // Cole a URL do CSV aqui
+
+   let dataGlobal = [];
+
+  function getData() {
+    $.ajax({
+      url: CSV_URL,
+      dataType: 'text',
+    }).done(function(data) {
+      dataGlobal = $.csv.toArrays(data);
+      preencherFiltros();
+      atualizarDashboard();
+    }).fail(function(error) {
+      console.error('Erro ao acessar o CSV:', error);
+    });
+  }
+
+  function preencherFiltros() {
+    const anos = new Set();
+    const meses = new Set();
+
+    dataGlobal.slice(1).forEach(row => {
+        const dataCriacao = row[1]; // Coluna "Data de criação"
+        if (dataCriacao) {
+            const dataParts = dataCriacao.split('-');
+            anos.add(dataParts[2]); // Ano
+            meses.add(dataParts[1]); // Mês
+        }
+    });
+
+    // Ordenando meses manualmente
+    const mesesOrdenados = [
+        { value: '01', nome: 'Janeiro' },
+        { value: '02', nome: 'Fevereiro' },
+        { value: '03', nome: 'Março' },
+        { value: '04', nome: 'Abril' },
+        { value: '05', nome: 'Maio' },
+        { value: '06', nome: 'Junho' },
+        { value: '07', nome: 'Julho' },
+        { value: '08', nome: 'Agosto' },
+        { value: '09', nome: 'Setembro' },
+        { value: '10', nome: 'Outubro' },
+        { value: '11', nome: 'Novembro' },
+        { value: '12', nome: 'Dezembro' }
+    ];
+
+    anos.forEach(ano => {
+        $('#filtro-ano').append(`<option value="${ano}">${ano}</option>`);
+    });
+
+    // Preencher o filtro de meses em ordem
+    mesesOrdenados.forEach(mes => {
+        if (meses.has(mes.value)) { // Adiciona apenas os meses que estão no conjunto
+            $('#filtro-mes').append(`<option value="${mes.value}">${mes.nome}</option>`);
+        }
+    });
+    
+    // ✅ Define valores padrão para ano e mês
+    $('#filtro-ano').val('2025');
+    $('#filtro-mes').val('06');
+
+    // ✅ Atualiza o dashboard com os filtros padrão aplicados
+    atualizarDashboard();
+}
+
+  function calcularSemana(dataString) {
+    const dataParts = dataString.split('-'); // DD-MM-YYYY
+    const dia = parseInt(dataParts[0]);
+    const mes = parseInt(dataParts[1]) - 1; // Meses em JS começam no 0
+    const ano = parseInt(dataParts[2]);
+    
+    const data = new Date(ano, mes, dia);
+    const diaDaSemana = data.getDay();
+    const ajuste = diaDaSemana < 6 ? -diaDaSemana - 1 : 0; // Ajusta para o sábado anterior
+    
+    const sabadoAnterior = new Date(data);
+    sabadoAnterior.setDate(data.getDate() + ajuste);
+    
+    const domingoSeguinte = new Date(sabadoAnterior);
+    domingoSeguinte.setDate(sabadoAnterior.getDate() + 6);
+    
+    return `${sabadoAnterior.getDate().toString().padStart(2, '0')}-${(sabadoAnterior.getMonth() + 1).toString().padStart(2, '0')} até ${domingoSeguinte.getDate().toString().padStart(2, '0')}-${(domingoSeguinte.getMonth() + 1).toString().padStart(2, '0')}`;
+  }
+  
+  function atualizarDashboard() {
+    const anoSelecionado = $('#filtro-ano').val();
+    const mesSelecionado = $('#filtro-mes').val();
+
+    let captados = 0, qualificados = 0, agendados = 0, realizados = 0, vendidos = 0;
+    const semanas = {};
+
+    const etapasQualificadas = [
+      "☑️ Reunião agendada",
+      "⚠️ Reagendar",
+      "✅ Contato feito",
+      "✅ Reunião feita",
+      "🤝 Negociação",
+      "📑 COF Enviada",
+      "⏳ Stand By (qualif.)",
+      "📝 COF Assinada",
+      "💰 Pré- contrato"
+    ];
+    
+    dataGlobal.slice(1).forEach(row => {
+      const dataCriacao = row[1]; // Coluna "Data de criação"
+      const dataAgendamento = row[14]; // Coluna "Data de agendamento"
+      const dataReuniaoRealizada = row[18]; // Coluna "Data da reunião realizada"
+      const dataFechamento = row[6]; // Coluna "Data de fechamento" - altere se necessário
+      const resolucao = row[25]; // Coluna "Resolução" - altere se necessário
+      const etapa = row[23];
+
+      const dataCriacaoParts = dataCriacao.split('-'); // DD-MM-YYYY
+      const anoCriacao = dataCriacaoParts[2];
+      const mesCriacao = dataCriacaoParts[1];
+      
+      if (dataCriacao) {
+      const semana = calcularSemana(dataCriacao);
+      const dataCriacaoParts = dataCriacao.split('-'); // DD-MM-YYYY
+      const anoCriacao = dataCriacaoParts[2];
+      const mesCriacao = dataCriacaoParts[1];
+
+      if ((!anoSelecionado || anoCriacao === anoSelecionado) &&
+          (!mesSelecionado || mesCriacao === mesSelecionado)) {
+
+        // Contagem de Captados
+        captados += 1;
+        if (!semanas[semana]) {
+          semanas[semana] = { captados: 0, qualificados: 0, agendados: 0, realizados: 0, vendidos: 0 };
+        }
+        semanas[semana].captados += 1;
+
+        // Contagem de Qualificados
+        if (etapasQualificadas.includes(etapa)) {
+          qualificados += 1; // Contagem global
+          semanas[semana].qualificados += 1; // Contagem por semana
+        }
+      }
+    }
+      
+      // Contagem de Agendados
+      if (dataAgendamento) {
+        const dataAgendamentoParts = dataAgendamento.split('-'); // DD-MM-YYYY
+        const anoAgendamento = dataAgendamentoParts[2];
+        const mesAgendamento = dataAgendamentoParts[1];
+
+        if ((!anoSelecionado || anoAgendamento === anoSelecionado) && 
+            (!mesSelecionado || mesAgendamento === mesSelecionado)) {
+          agendados += 1;
+          const semana = calcularSemana(dataAgendamento);
+          if (!semanas[semana]) {
+            semanas[semana] = { captados: 0, qualificados: 0, agendados: 0, realizados: 0, vendidos: 0 };
+          }
+          semanas[semana].agendados += 1; // Contando como agendados
+        }
+      }
+      
+       // Contagem de Realizados
+      if (dataReuniaoRealizada) {
+        const dataReuniaoParts = dataReuniaoRealizada.split('-'); // DD-MM-YYYY
+        const anoReuniao = dataReuniaoParts[2];
+        const mesReuniao = dataReuniaoParts[1];
+
+        if ((!anoSelecionado || anoReuniao === anoSelecionado) && 
+            (!mesSelecionado || mesReuniao === mesSelecionado)) {
+          realizados += 1;
+          const semana = calcularSemana(dataReuniaoRealizada);
+          if (!semanas[semana]) {
+            semanas[semana] = { captados: 0, qualificados: 0, agendados: 0, realizados: 0, vendidos: 0 };
+          }
+          semanas[semana].realizados += 1; // Contando como realizados
+        }
+      }
+      
+      // Contagem de Vendas
+      if (dataFechamento && resolucao === 'TRUE') {
+        const dataFechamentoParts = dataFechamento.split('-'); // DD-MM-YYYY
+        const anoFechamento = dataFechamentoParts[2];
+        const mesFechamento = dataFechamentoParts[1];
+
+        if ((!anoSelecionado || anoFechamento === anoSelecionado) && 
+            (!mesSelecionado || mesFechamento === mesSelecionado)) {
+          vendidos += 1;
+          const semana = calcularSemana(dataFechamento);
+          if (!semanas[semana]) {
+            semanas[semana] = { captados: 0, qualificados: 0, agendados: 0, realizados: 0, vendidos: 0 };
+          }
+          semanas[semana].vendidos += 1; // Contando como vendas
+        }
+      }
+      
+    });
+
+    $('#captados').html(`<strong>Captados</strong> ${captados}`);
+    $('#agendados').html(`<strong>Reuniões Agendadas</strong> ${agendados}`);
+    $('#qualificados').html(`<strong>Qualificados</strong> ${qualificados}`);
+    
+    $('#realizados').html(`<strong>Reuniões Realizadas</strong> ${realizados}`);
+    $('#vendidos').html(`<strong>Vendas</strong> ${vendidos}`);
+    
+    // Cálculo das proporções
+    const porcentagemAgendadoCaptado = captados > 0 ? ((agendados / captados) * 100).toFixed(2) : 0;
+    const porcentagemRealizadoAgendado = agendados > 0 ? ((realizados / agendados) * 100).toFixed(2) : 0;
+    const porcentagemVendaRealizado = realizados > 0 ? ((vendidos / realizados) * 100).toFixed(2) : 0;
+     const porcentagemQualificadoCaptado = captados > 0 ? ((qualificados / captados) * 100).toFixed(2) : 0;
+    
+    const porcentagemAgendadoQualificado = qualificados > 0 ? ((agendados / qualificados) * 100).toFixed(2) : 0;
+
+    $('#agendadoCaptado').html(`<strong>Agendado x Captado</strong> ${porcentagemAgendadoCaptado}%`);
+    $('#realizadoAgendado').html(`<strong>Realizado x Agendado</strong>  ${porcentagemRealizadoAgendado}%`);
+    $('#vendaRealizado').html(`<strong>Venda x Realizado</strong>  ${porcentagemVendaRealizado}%`);
+    $('#qualificadoCaptado').html(`<strong>qualificado x captado</strong>  ${porcentagemQualificadoCaptado}%`);
+    $('#agendadoQualificado').html(`<strong>agendado x qualificado</strong>  ${porcentagemAgendadoQualificado}%`);
+    
+    // Limpar tabela antiga
+    const $tbody = $('#tabela-semanas tbody');
+    $tbody.empty();
+
+    // Inserir dados na tabela
+    for (const [semana, dados] of Object.entries(semanas)) {
+      $tbody.prepend(`
+        <tr>
+          <td>${semana}</td>
+          <td>${dados.captados}</td>
+          <td>${dados.qualificados}</td>
+          <td>${dados.agendados}</td>
+          <td>${dados.realizados}</td>
+          <td>${dados.vendidos}</td>
+        </tr>
+      `);
+    }
+    
+    // Criar gráfico de pizza com captados por semana
+const ctx = document.getElementById('graficoPizza').getContext('2d');
+
+// Destruir gráfico anterior se existir
+if (window.graficoPizzaCaptados) {
+  window.graficoPizzaCaptados.destroy();
+}
+
+const semanasLabels = Object.keys(semanas).reverse();
+const captadosData = semanasLabels.map(semana => semanas[semana].captados);
+
+
+// Cores automáticas para cada fatia
+const cores = semanasLabels.map((_, i) => `hsl(${i * 360 / semanasLabels.length}, 70%, 60%)`);
+
+window.graficoPizzaCaptados = new Chart(ctx, {
+  type: 'pie',
+  data: {
+    labels: semanasLabels.map((semana, i) => `${semana}`),
+    datasets: [{
+      label: 'Captados por semana',
+      data: captadosData,
+      backgroundColor: cores,
+      borderColor: '#ffffff',
+      borderWidth: 1
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          font: {
+            size: 14
+          }
+        }
+      },
+       tooltip: {
+      enabled: false // 👈 desativa o tooltip
+    },
+      datalabels: {
+        color: '#000',
+        font: {
+          weight: 'bold',
+          size: 14
+        },
+        formatter: (value, context) => {
+          const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+          const percent = ((value / total) * 100).toFixed(1);
+          return `${value} (${percent}%)`;
+        }
+      }
+    }
+  },
+  plugins: [ChartDataLabels]
+});
+
+    // Criar gráfico de barras com captados por semana
+const ctxBarra = document.getElementById('graficoBarra').getContext('2d');
+
+// Destruir gráfico anterior se existir
+if (window.graficoBarraCaptados) {
+  window.graficoBarraCaptados.destroy();
+}
+
+window.graficoBarraCaptados = new Chart(ctxBarra, {
+  type: 'bar',
+  data: {
+    labels: semanasLabels,
+    datasets: [{
+      label: 'Captados',
+      data: captadosData,
+      backgroundColor: cores,
+      borderRadius: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        enabled: false
+      },
+      datalabels: {
+        color: '#000',
+        font: {
+          weight: 'bold',
+          size: 14
+        },
+        anchor: 'end',
+        align: 'top',
+        formatter: (value, context) => {
+          const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+          const percent = ((value / total) * 100).toFixed(1);
+          return `${value} (${percent}%)`;
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  },
+  plugins: [ChartDataLabels]
+});
+
+
+    
+  }
+
+  $(document).ready(function() {
+    getData();
+
+    $('#filtro-ano, #filtro-mes').change(function() {
+      atualizarDashboard();
+    });
+  });
+</script>
+<style>
+    :root {
+  --bg1: #aaa;
+  --bg2: #bbb;
+  --bg3: #ccc;
+  --bg4: #ddd;
+  --bg5: #eee;
+
+  --color: #555;
+}
+
+body {
+  background: var(--bg5);
+  color: var(--color);
+}
+
+main {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.visaoGeral,
+.visaoPercentual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 48%;
+}
+
+.visaoGeral span,
+.visaoPercentual span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--bg2);
+  background: var(--bg4);
+  flex: 1;
+  font-size: 1.8rem;
+  min-width: 140px;
+}
+
+.visaoGeral span strong,
+.visaoPercentual span strong {
+  font: 700 0.7rem Arial;
+  text-transform: uppercase;
+}
+
+.filtros {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.filtros select {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background-color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filtros select:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+#tabela-semanas {
+  background: var(--bg4);
+  display: flex;
+  flex-direction: column;
+  flex: 100%;
+  min-width: 635px;
+  height: max-content;
+}
+
+#tabela-semanas tr,
+#tabela-semanas tr td,
+#tabela-semanas tr th {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  font: 300 0.9rem Arial;
+  flex: 1;
+}
+
+#tabela-semanas tr td,
+#tabela-semanas tr th {
+  border: 1px solid var(--bg1);
+  padding: 5px;
+}
+
+#tabela-semanas tr td:first-of-type,
+#tabela-semanas tr th:first-of-type {
+  width: 150px;
+  flex: unset;
+}
+
+#tabela-semanas tr th {
+  font: 800 10px Arial !important;
+}
+
+#graficoPizza,
+#graficoBarra{
+  max-width: 500px !important;
+  max-height: 300px;
+  margin: auto;
+}
+
+</style>
+</body>
+</html>
