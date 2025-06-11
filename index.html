@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acompanhamento - SDR</title>
+
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-funnel@1.2.0/dist/d3-funnel.min.js"></script>
+
 </head>
 <body>
     <wrapper>
@@ -19,24 +23,25 @@
 </nav>
   <main>
     <div class="visaoGeral">
-      <span id="captados"><strong>Captados</strong> 0</span>
+      <span id="captados"><strong>Leads</strong> 0</span>
       <span id="qualificados"><strong>Qualificados</strong> 0</span>
       <span id="agendados"><strong>Reuniões Agendadas</strong> 0</span>
       <span id="realizados"><strong>Reuniões Realizadas</strong> 0</span>
       <span id="vendidos"><strong>Vendas</strong> 0</span>
     </div>
     <div class="visaoPercentual">
-      <span id="agendadoCaptado"><strong>Agendado x Captado</strong> 0</span>
+      <span id="qualificadoCaptado"><strong>Qualificado x Lead</strong> 0</span>
+      <span id="agendadoQualificado"><strong>Agendado x qualificado</strong> 0</span>
       <span id="realizadoAgendado"><strong>Realizado x Agendado</strong> 0</span>
       <span id="vendaRealizado"><strong>Venda x Realizado</strong> 0</span>
-      <span id="qualificadoCaptado"><strong>Qualificado x Captado</strong> 0</span>
-      <span id="agendadoQualificado"><strong>Agendado x qualificado</strong> 0</span>
+      <span id="agendadoCaptado"><strong>Agendado x Lead</strong> 0</span>
+      
     </div>
     <table id="tabela-semanas">
       <thead>
         <tr>
           <th>Semana</th>
-          <th>Captados</th>
+          <th>Leads</th>
           <th>Qualificados</th>
           <th>Agendados</th>
           <th>Realizados</th>
@@ -47,15 +52,24 @@
         <!-- As linhas da tabela serão preenchidas aqui -->
       </tbody>
     </table>
-    <canvas id="graficoPizza" width="400!Important" height="400"></canvas>
+    <canvas id="graficoPizza" width="400!Important" height="400" style="display: none!important;"></canvas>
     <canvas id="graficoBarra" width="400" height="300"></canvas>
+    <div id="funnel"></div>
+
 
   </main>
 </wrapper>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.11/jquery.csv.min.js"></script>
+
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-funnel@1.0.0/dist/chartjs-chart-funnel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-funnel"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 
 <script>
@@ -251,7 +265,7 @@
       
     });
 
-    $('#captados').html(`<strong>Captados</strong> ${captados}`);
+    $('#captados').html(`<strong>Leads</strong> ${captados}`);
     $('#agendados').html(`<strong>Reuniões Agendadas</strong> ${agendados}`);
     $('#qualificados').html(`<strong>Qualificados</strong> ${qualificados}`);
     
@@ -266,10 +280,10 @@
     
     const porcentagemAgendadoQualificado = qualificados > 0 ? ((agendados / qualificados) * 100).toFixed(2) : 0;
 
-    $('#agendadoCaptado').html(`<strong>Agendado x Captado</strong> ${porcentagemAgendadoCaptado}%`);
+    $('#agendadoCaptado').html(`<strong>Agendado x Lead</strong> ${porcentagemAgendadoCaptado}%`);
     $('#realizadoAgendado').html(`<strong>Realizado x Agendado</strong>  ${porcentagemRealizadoAgendado}%`);
     $('#vendaRealizado').html(`<strong>Venda x Realizado</strong>  ${porcentagemVendaRealizado}%`);
-    $('#qualificadoCaptado').html(`<strong>qualificado x captado</strong>  ${porcentagemQualificadoCaptado}%`);
+    $('#qualificadoCaptado').html(`<strong>qualificado x Lead</strong>  ${porcentagemQualificadoCaptado}%`);
     $('#agendadoQualificado').html(`<strong>agendado x qualificado</strong>  ${porcentagemAgendadoQualificado}%`);
     
     // Limpar tabela antiga
@@ -401,6 +415,40 @@ window.graficoBarraCaptados = new Chart(ctxBarra, {
 });
 
 
+const data = {
+      label: "Funil de Vendas",
+      subLabelValue: "raw",
+      colors: ['#4CAF50', '#2196F3', '#FFC107', '#FF9800', '#F44336'],
+      values: [
+        ["Captados", captados],
+        ["Qualificados", qualificados],
+        ["Agendados", agendados],
+        ["Realizados", realizados],
+        ["Vendas", vendidos]
+      ]
+    };
+
+    const options = {
+      chart: {
+        bottomWidth: 1 / 3,
+        bottomPinch: 0,
+        animate: 500,
+        curve: {
+          enabled: true
+        }
+      },
+      block: {
+        dynamicHeight: false,
+        highlight: true
+      },
+      label: {
+        fontSize: "18px",
+        fill: "#fff"
+      }
+    };
+
+    const chart = new D3Funnel("#funnel");
+    chart.draw(data.values, options);
     
   }
 
@@ -457,7 +505,7 @@ main {
 
 .visaoGeral span strong,
 .visaoPercentual span strong {
-  font: 700 0.7rem Arial;
+  font: 900 9px Arial;
   text-transform: uppercase;
 }
 
@@ -522,14 +570,20 @@ main {
 }
 
 #graficoPizza,
-#graficoBarra{
+#graficoBarra,
+#graficoFunil{
   max-width: 500px !important;
   max-height: 300px;
   margin: auto;
 }
 
+  #funnel {
+      width: 500px;
+      margin: 40px auto;
+    }
+
 wrapper {
-    min-width: 700px;
+    min-width: 750px;
     display: block;
     margin: auto;
     width: 70%;
