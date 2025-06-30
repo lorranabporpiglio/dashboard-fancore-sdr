@@ -35,6 +35,7 @@
       <span id="qualificados"><strong>Qualificados</strong> 0</span>
       <span id="agendados"><strong>Reuniões Agendadas</strong> 0</span>
       <span id="realizados"><strong>Reuniões Realizadas</strong> 0</span>
+      <span id="noshow"><strong>Noshow</strong> 0</span>
       <span id="vendidos"><strong>Vendas</strong> 0</span>
     </div>
     <div class="visaoPercentual">
@@ -43,6 +44,7 @@
       <span id="realizadoAgendado"><strong>Realizado x Agendado</strong> 0</span>
       <span id="vendaRealizado"><strong>Venda x Realizado</strong> 0</span>
       <span id="agendadoCaptado"><strong>Agendado x Lead</strong> 0</span>
+      <span id="noshowAgendado"><strong>Noshow x Agendado</strong> 0</span>
       
     </div>
     <table id="tabela-semanas">
@@ -169,7 +171,7 @@
     const anoSelecionado = $('#filtro-ano').val();
     const mesSelecionado = $('#filtro-mes').val();
 
-    let captados = 0, qualificados = 0, agendados = 0, realizados = 0, vendidos = 0;
+    let captados = 0, qualificados = 0, agendados = 0, realizados = 0, vendidos = 0, noshows = 0;
     const semanas = {};
 
     const etapasQualificadas = [
@@ -182,6 +184,10 @@
       "⏳ Stand By (qualif.)",
       "📝 COF Assinada",
       "💰 Pré- contrato"
+    ];
+
+     const noshow = [
+      "Noshow"
     ];
     
     dataGlobal.slice(1).forEach(row => {
@@ -217,6 +223,12 @@
           qualificados += 1; // Contagem global
           semanas[semana].qualificados += 1; // Contagem por semana
         }
+
+        if (noshow.includes(etapa)) {
+          noshows += 1; // Contagem global
+          semanas[semana].noshows += 1; // Contagem por semana
+        }
+
       }
     }
       
@@ -276,7 +288,7 @@
     $('#captados').html(`<strong>Leads</strong> ${captados}`);
     $('#agendados').html(`<strong>Reuniões Agendadas</strong> ${agendados}`);
     $('#qualificados').html(`<strong>Qualificados</strong> ${qualificados}`);
-    
+    $('#noshow').html(`<strong>Noshow</strong> ${noshows}`);
     $('#realizados').html(`<strong>Reuniões Realizadas</strong> ${realizados}`);
     $('#vendidos').html(`<strong>Vendas</strong> ${vendidos}`);
     
@@ -284,15 +296,16 @@
     const porcentagemAgendadoCaptado = captados > 0 ? ((agendados / captados) * 100).toFixed(2) : 0;
     const porcentagemRealizadoAgendado = agendados > 0 ? ((realizados / agendados) * 100).toFixed(2) : 0;
     const porcentagemVendaRealizado = realizados > 0 ? ((vendidos / realizados) * 100).toFixed(2) : 0;
-     const porcentagemQualificadoCaptado = captados > 0 ? ((qualificados / captados) * 100).toFixed(2) : 0;
-    
+    const porcentagemQualificadoCaptado = captados > 0 ? ((qualificados / captados) * 100).toFixed(2) : 0;
+    const porcentagemNoshow = noshows > 0 ? ((noshows / agendados) * 100).toFixed(2) : 0;
     const porcentagemAgendadoQualificado = qualificados > 0 ? ((agendados / qualificados) * 100).toFixed(2) : 0;
 
     $('#agendadoCaptado').html(`<strong>Agendado x Lead</strong> ${porcentagemAgendadoCaptado}%`);
     $('#realizadoAgendado').html(`<strong>Realizado x Agendado</strong>  ${porcentagemRealizadoAgendado}%`);
     $('#vendaRealizado').html(`<strong>Venda x Realizado</strong>  ${porcentagemVendaRealizado}%`);
+     $('#agendadoQualificado').html(`<strong>agendado x qualificado</strong>  ${porcentagemAgendadoQualificado}%`);
     $('#qualificadoCaptado').html(`<strong>qualificado x Lead</strong>  ${porcentagemQualificadoCaptado}%`);
-    $('#agendadoQualificado').html(`<strong>agendado x qualificado</strong>  ${porcentagemAgendadoQualificado}%`);
+    $('#noshowAgendado').html(`<strong>noshow x agendado</strong>  ${porcentagemNoshow}%`);
     
     // Limpar tabela antiga
     const $tbody = $('#tabela-semanas tbody');
